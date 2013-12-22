@@ -192,7 +192,7 @@ operator simplex<<<index>>>(
 
 operator entry()
 {
-  Integer dim = 1024;
+  Integer dim = 32;
   Float32 u[],v[],t[],o[];
   u.resize(dim*dim);
   v.resize(dim*dim);
