@@ -1,6 +1,9 @@
 // SimplexNoise
 // http://staffwww.itn.liu.se/~stegu/simplexnoise/simplexnoise.pdf - Stefan Gustavson
 
+require RGB;
+require Image2DRGB;
+
 struct Gradient
 {
   Float32 x, y, z, w;
@@ -182,74 +185,68 @@ inline Float32 SimplexNoise.noise2D(Float32 xin, Float32 yin)
 
 operator simplex<<<index>>>(
   in SimplexNoise noise,
-  Float32 ix[],
-  Float32 iy[],
-  io Float32 o[]
+  io Image2DRGB image,
   )
 {
-  o[index] = noise.noise2D(ix[index], iy[index]);
+  Index row = index / image.width;
+  Index col = index % image.width;
+  Float32 u = 0.0;
+  Float32 v = 0.0;
+
+  if (row>0)
+  {
+    u = Float32(row)/Float32(image.height);
+  }
+  if (col>0)
+  {
+    v = Float32(col)/Float32(image.width);
+  }
+
+  // get noise2d and rescale to 0-1
+  Float32 value = (noise.noise2D(u, v) + 1.0)*0.5;
+
+  Byte shade = Byte(value*256);
+  image.setPixel(col, row, RGB(shade,shade,shade));
+
 }
 
-operator entry()
+operator computePixels(
+  Size resolution,
+  io Image2DRGB image)
 {
-  Integer dim = 32;
-  Float32 u[],v[],t[],o[];
-  u.resize(dim*dim);
-  v.resize(dim*dim);
-  t.resize(dim);
+  image.resize(resolution, resolution);
 
-  // generate sequence of numbers [0-1]
-  for (Index i=0; i<dim;i++)
-  {
-    if(i==0)
-    {
-      t[i] = 0.0;
-    }
-    else
-    {
-      t[i] = i/Float32(dim);
-    }
-  }
-
-  // generate samples in u,v
-  for (Index i=0; i<dim; i++)
-  {
-    for (Index j=0; j<dim; j++)
-    {
-      u[i*dim+j] = t[i];
-      v[i*dim+j] = t[j];
-    }
-  }
-
-  // do simplex noise, using PEX
   SimplexNoise snoise();
-  o.resize(dim*dim);
-  simplex<<<dim*dim>>>(snoise, u, v, o);
+  simplex<<<image.pixels.size()>>>(snoise, image);
+  image.incrementVersion();
 
-  // print ascii art
-  for (Index y=0; y<dim; y++)
-  {
-    String line;
-    for (Index x=0; x<dim; x++)
-    {
-      Float32 val = o[y*dim+x];
-      if ( val < -0.5)
-      {
-        line += "#";
-      }
-      else if (val < 0)
-      {
-        line += "*";
-      }
-      else if (val > 0.5)
-      {
-        line += " ";
-      }
-      else
-      {
-        line += ".";
-      }
-    }
-    report(line);
-  }
+  // Integer dim = resolution;
+  // Float32 u[],v[],t[],o[];
+  // u.resize(dim*dim);
+  // v.resize(dim*dim);
+  // t.resize(dim);
+
+  // // generate sequence of numbers [0-1]
+  // for (Index i=0; i<dim;i++)
+  // {
+  //   if(i==0)
+  //   {
+  //     t[i] = 0.0;
+  //   }
+  //   else
+  //   {
+  //     t[i] = i/Float32(dim);
+  //   }
+  // }
+
+  // // generate samples in u,v
+  // for (Index i=0; i<dim; i++)
+  // {
+  //   for (Index j=0; j<dim; j++)
+  //   {
+  //     u[i*dim+j] = t[i];
+  //     v[i*dim+j] = t[j];
+  //   }
+  // }
+
 }
