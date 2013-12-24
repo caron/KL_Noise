@@ -186,6 +186,7 @@ inline Float32 SimplexNoise.noise2D(Float32 xin, Float32 yin)
 operator simplex<<<index>>>(
   in SimplexNoise noise,
   io Image2DRGB image,
+  in Float32 scale
   )
 {
   Index row = index / image.width;
@@ -196,10 +197,12 @@ operator simplex<<<index>>>(
   if (row>0)
   {
     u = Float32(row)/Float32(image.height);
+    u *= scale;
   }
   if (col>0)
   {
     v = Float32(col)/Float32(image.width);
+    v *= scale;
   }
 
   // get noise2d and rescale to 0-1
@@ -212,12 +215,13 @@ operator simplex<<<index>>>(
 
 operator computePixels(
   Size resolution,
+  Float32 scale,
   io Image2DRGB image)
 {
   image.resize(resolution, resolution);
 
   SimplexNoise snoise();
-  simplex<<<image.pixels.size()>>>(snoise, image);
+  simplex<<<image.pixels.size()>>>(snoise, image, scale);
   image.incrementVersion();
 
   // Integer dim = resolution;
