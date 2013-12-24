@@ -1,7 +1,4 @@
-
-#
-# Copyright 2010-2012 Fabric Technologies Inc. All rights reserved.
-#
+# SimplexNoise
 
 from PySide.QtCore import QSize
 from FabricEngine.SceneGraph.Nodes.Rendering import *
