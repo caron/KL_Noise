@@ -1,0 +1,419 @@
+// various noise functions
+
+const UInt32 UInt32Max = 4294967295;
+
+// perlin noise helper functions
+
+inline Integer fastfloor (Float32 x)
+{
+  Integer xi = Integer(x);
+  return x<xi ? xi-1 : xi;
+}
+
+inline Float32 floorfrac (Float32 x, io Integer i)
+{
+  i = fastfloor(x);
+  return x - i;
+}
+
+inline Float32 fade (Float32 t)
+{
+  return t * t * t * (t * (t * 6 - 15) + 10);
+}
+
+inline Float32 lerp (Float32 t, Float32 a, Float32 b)
+{
+  return a + t * (b - a);
+}
+
+// 1D
+inline Float32 grad (SInt32 hash, Float32 x) 
+{
+  SInt32 h = hash & 15;
+  Float32 g = 1 + (h & 7);
+  if (h&8) g = -g;
+  return g * x;
+}
+
+// 2D
+inline Float32 grad (SInt32 hash, Float32 x, Float32 y) 
+{
+  SInt32 h = hash & 7;
+  Float32 u = h < 4 ? x : y;
+  Float32 v = h < 4 ? y : x;
+  return ((h&1) == 0 ? u : -u) + ((h&2) == 0 ? 2.0 * v : -2.0 * v);
+}
+
+// 3D
+inline Float32 grad (SInt32 hash, Float32 x, Float32 y, Float32 z) 
+{
+  SInt32 h = hash & 15;
+  Float32 u = h < 8 ? x : y;
+  Float32 v = h < 4 ? y : h==12||h==14 ? x : z;
+  return ((h&1) == 0 ? u : -u) + ((h&2) == 0 ? v : -v);
+}
+
+inline UInt32 rot (UInt32 x, UInt32 k)
+{
+  return (x << k) | (x >> (32-k));
+}
+
+inline mix (io UInt32 a, io UInt32 b, io UInt32 c)
+{
+  a -= c;  a ^= rot(c, 4);  c += b;
+  b -= a;  b ^= rot(a, 6);  a += c;
+  c -= b;  c ^= rot(b, 8);  b += a;
+  a -= c;  a ^= rot(c,16);  c += b;
+  b -= a;  b ^= rot(a,19);  a += c;
+  c -= b;  c ^= rot(b, 4);  b += a;
+}
+
+inline final (io UInt32 a, io UInt32 b, io UInt32 c)
+{
+  c ^= b; c -= rot(b,14);
+  a ^= c; a -= rot(c,11);
+  b ^= a; b -= rot(a,25);
+  c ^= b; c -= rot(b,16);
+  a ^= c; a -= rot(c, 4);
+  b ^= a; b -= rot(a,14);
+  c ^= b; c -= rot(b,24);
+}
+
+inline Float32 scale1 (io Float32 result)
+{
+  return 0.2500 * result;
+}
+inline Float32 scale2 (io Float32 result)
+{
+  return 0.6616 * result;
+}
+inline Float32 scale3 (io Float32 result)
+{
+  return 0.9820 * result;
+}
+inline Float32 scale4 (io Float32 result)
+{
+  return 0.8344 * result;
+}
+
+// hashing functions from bob jenkins
+// http://burtleburtle.net/bob/c/lookup3.c
+// porting directly from c was proving difficult so i had to extract
+// exactly what i needed and break it into different functions
+
+// 1D
+inline UInt32 inthash (io UInt32 k[1])
+{
+  // now hash the data!
+  UInt32 a, b, c;
+  a = b = c = 0xdeadbeef + (k.size() << 2) + 13;
+  a += k[0];
+  final(a, b, c);
+  return c;
+}
+
+// 2D
+inline UInt32 inthash (io UInt32 k[2])
+{
+  // now hash the data!
+  UInt32 a, b, c;
+  a = b = c = 0xdeadbeef + (k.size() << 2) + 13;
+  b += k[1];
+  a += k[0];
+  final(a, b, c);
+  return c;
+}
+
+// 3D
+inline UInt32 inthash (io UInt32 k[3])
+{
+  // now hash the data!
+  UInt32 a, b, c;
+  a = b = c = 0xdeadbeef + (k.size() << 2) + 13;
+  c += k[2];
+  b += k[1];
+  a += k[0];
+  final(a, b, c);
+  return c;
+}
+
+// 1D
+function UInt32 Hash(UInt32 x)
+{
+  UInt32 iv[1];
+  iv[0] = x;
+  return inthash(iv);  
+}
+
+// 2D
+function UInt32 Hash(UInt32 x, UInt32 y)
+{
+  UInt32 iv[2];
+  iv[0] = x;
+  iv[1] = y;
+  return inthash(iv);  
+}
+
+// 3D
+function UInt32 Hash(UInt32 x, UInt32 y, UInt32 z)
+{
+  UInt32 iv[3];
+  iv[0] = x;
+  iv[1] = y;
+  iv[2] = z;
+  return inthash(iv);  
+}
+
+// perlin noise functions
+// 1D
+function Float32 perlin (Float32 ix)
+{
+  Float32 fx = ix;
+
+  // Integer X; Float32 fx = floorfrac(x, X);
+
+  Float32 u = fade(fx);
+
+  SInt32  X = SInt32(floor(fx)) & 255;
+  fx -= floor(fx);
+
+
+  Float32 result = lerp (u, grad (Hash (X  ), fx      ),
+                            grad (Hash (X+1), fx-1.0 ));
+  return scale1 (result);
+}
+
+// 2D
+function Float32 perlin (Float32 ix, Float32 iy)
+{
+
+  Float32 fx = ix;
+  Float32 fy = iy;
+
+  // Integer X; Float32 fx = floorfrac(x, X);
+  // Integer Y; Float32 fy = floorfrac(y, Y);
+
+  SInt32 X = SInt32(floor(fx)) & 255;
+  SInt32 Y = SInt32(floor(fy)) & 255;
+  fx -= floor(fx);
+  fy -= floor(fy);
+
+  Float32  u = fade(fx);
+  Float32  v = fade(fy);
+
+
+  Float32 result = lerp (v, lerp (u, grad (Hash (X  , Y  ), fx    , fy    ),
+                                     grad (Hash (X+1, Y  ), fx-1.0, fy    )),
+                            lerp (u, grad (Hash (X  , Y+1), fx    , fy-1.0),
+                                     grad (Hash (X+1, Y+1), fx-1.0, fy-1.0)));
+
+  return scale2 (result);
+}
+
+// 3D
+function Float32 perlin (Float32 ix, Float32 iy, Float32 iz)
+{
+
+  Float32 fx = ix;
+  Float32 fy = iy;
+  Float32 fz = iz;
+
+  // Integer X; Float32 fx = floorfrac(x, X);
+  // Integer Y; Float32 fy = floorfrac(y, Y);
+  // Integer Z; Float32 fz = floorfrac(z, Z);
+
+  // Float32 u = fade(fx);
+  // Float32 v = fade(fy);
+  // Float32 w = fade(fz);
+
+  SInt32 X = SInt32(floor(fx)) & 255;
+  SInt32 Y = SInt32(floor(fy)) & 255;
+  SInt32 Z = SInt32(floor(fz)) & 255;
+  fx -= floor(fx);
+  fy -= floor(fy);
+  fz -= floor(fz);
+  Float32  u = fade(fx);
+  Float32  v = fade(fy);
+  Float32  w = fade(fz);
+
+
+  Float32 result = lerp (w, lerp (v, lerp (u, grad (Hash (X  , Y  , Z  ), fx    , fy    , fz      ),
+                                              grad (Hash (X+1, Y  , Z  ), fx-1.0, fy    , fz      )),
+                                     lerp (u, grad (Hash (X  , Y+1, Z  ), fx    , fy-1.0, fz      ),
+                                              grad (Hash (X+1, Y+1, Z  ), fx-1.0, fy-1.0, fz      ))),
+                            lerp (v, lerp (u, grad (Hash (X  , Y  , Z+1), fx    , fy    , fz-1.0 ),
+                                              grad (Hash (X+1, Y  , Z+1), fx-1.0, fy    , fz-1.0 )),
+                                     lerp (u, grad (Hash (X  , Y+1, Z+1), fx    , fy-1.0, fz-1.0 ),
+                                              grad (Hash (X+1, Y+1, Z+1), fx-1.0, fy-1.0, fz-1.0 ))));
+
+  return scale3 (result);
+}
+
+// simplex noise helper functions
+
+struct Gradient
+{
+  Float32 x, y, z, w;
+};
+
+function Gradient()
+{
+  this.x = 0;
+  this.y = 0;
+  this.z = 0;
+  this.w = 0;
+}
+
+function Gradient(Float32 x, Float32 y, Float32 z)
+{
+  this.x = x;
+  this.y = y;
+  this.z = z;
+  this.w = 0;
+}
+
+function Gradient(Float32 x, Float32 y, Float32 z, Float32 w) {
+  this.x = x;
+  this.y = y;
+  this.z = z;
+  this.w = w;
+}
+
+// 2D
+inline Float32 dot(Gradient g, Float32 x, Float32 y)
+{
+  return g.x*x + g.y*y;
+}
+
+// 3D
+inline Float32 dot(Gradient g, Float32 x, Float32 y, Float32 z)
+{
+  return g.x*x + g.y*y + g.z*z;
+}
+
+// 4D
+inline Float32 dot(Gradient g, Float32 x, Float32 y, Float32 z, Float32 w)
+{
+  return g.x*x + g.y*y + g.z*z + g.w*w;
+}
+
+
+// simplex noise functions
+
+// 2D
+function Float32 simplex (Float32 xin, Float32 yin)
+{
+  Gradient grad3[];
+  Gradient grad4[];
+
+  SInt16 perm[512];
+  SInt16 permMod12[512];
+
+  const Float32 g3[] = [
+    1,1,0,-1,1,0,1,-1,0,-1,-1,0,
+    1,0,1,-1,0,1,1,0,-1,-1,0,-1,
+    0,1,1,0,-1,1,0,1,-1,0,-1,-1
+    ];
+
+  for(Index i=0; i<g3.size(); i+=3)
+  {
+    grad3.push(Gradient(g3[i], g3[i+1], g3[i+2]));
+  }
+
+  const Float32 g4[] = [
+    0,1,1,1,0,1,1,-1,0,1,-1,1,0,1,-1,-1,
+    0,-1,1,1,0,-1,1,-1,0,-1,-1,1,0,-1,-1,-1,
+    1,0,1,1,1,0,1,-1,1,0,-1,1,1,0,-1,-1,
+    -1,0,1,1,-1,0,1,-1,-1,0,-1,1,-1,0,-1,-1,
+    1,1,0,1,1,1,0,-1,1,-1,0,1,1,-1,0,-1,
+    -1,1,0,1,-1,1,0,-1,-1,-1,0,1,-1,-1,0,-1,
+    1,1,1,0,1,1,-1,0,1,-1,1,0,1,-1,-1,0,
+    -1,1,1,0,-1,1,-1,0,-1,-1,1,0,-1,-1,-1,0
+    ];
+
+  for(Index i=0; i<g4.size(); i+=4)
+  {
+    grad4.push(Gradient(g4[i], g4[i+1], g4[i+2], g4[i+3]));
+  }
+
+  const SInt16 p[] = [
+    151,160,137,91,90,15,131,13,201,95,96,53,194,233,7,225,140,36,103,30,69,142,
+    8,99,37,240,21,10,23,190,6,148,247,120,234,75,0,26,197,62,94,252,219,203,117,
+    35,11,32,57,177,33,88,237,149,56,87,174,20,125,136,171,168,68,175,74,165,71,
+    134,139,48,27,166,77,146,158,231,83,111,229,122,60,211,133,230,220,105,92,41,
+    55,46,245,40,244,102,143,54,65,25,63,161,1,216,80,73,209,76,132,187,208,89,
+    18,169,200,196,135,130,116,188,159,86,164,100,109,198,173,186,3,64,52,217,226,
+    250,124,123,5,202,38,147,118,126,255,82,85,212,207,206,59,227,47,16,58,17,182,
+    189,28,42,223,183,170,213,119,248,152,2,44,154,163,70,221,153,101,155,167,43,
+    172,9,129,22,39,253,19,98,108,110,79,113,224,232,178,185,112,104,218,246,97,
+    228,251,34,242,193,238,210,144,12,191,179,162,241,81,51,145,235,249,14,239,
+    107,49,192,214,31,181,199,106,157,184,84,204,176,115,121,50,45,127,4,150,254,
+    138,236,205,93,222,114,67,29,24,72,243,141,128,195,78,66,215,61,156,180
+    ];
+
+  for(Index i=0; i<512; i++)
+  {
+    perm[i] = p[i & 255];
+    permMod12[i] = perm[i] % 12;
+  }
+
+  Float32 F2, G2, F3, G3, F4, G4;
+
+  F2 = 0.36602540378; // 0.5*(sqrt(3.0)-1.0);
+  G2 = 0.2113248654; // (3.0-sqrt(3.0))/6.0;
+  // F3 = 0.333333333; // 1.0/3.0;
+  // G3 = 0.166666667; //1.0/6.0;
+  // F4 = 0.309016994; //(sqrt(5.0)-1.0)/4.0;
+  // G4 = 0.138196601; //(5.0-sqrt(5.0))/20.0;
+
+  Float32 n0, n1, n2; // Noise contributions from the three corners
+  // Skew the input space to determine which simplex cell we're in
+  Float32 s = (xin+yin)*F2; // Hairy factor for 2D
+  Integer i = fastfloor(xin+s);
+  Integer j = fastfloor(yin+s);
+  Float32 t = (i+j)*G2;
+  Float32 X0 = i-t; // Unskew the cell origin back to (x,y) space
+  Float32 Y0 = j-t;
+  Float32 x0 = xin-X0; // The x,y distances from the cell origin
+  Float32 y0 = yin-Y0;
+  // For the 2D case, the simplex shape is an equilateral triangle.
+  // Determine which simplex we are in.
+  Integer i1, j1; // Offsets for second (middle) corner of simplex in (i,j) coords
+  if(x0>y0) {i1=1; j1=0;} // lower triangle, XY order: (0,0)->(1,0)->(1,1)
+  else {i1=0; j1=1;}      // upper triangle, YX order: (0,0)->(0,1)->(1,1)
+  // A step of (1,0) in (i,j) means a step of (1-c,-c) in (x,y), and
+  // a step of (0,1) in (i,j) means a step of (-c,1-c) in (x,y), where
+  // c = (3-sqrt(3))/6
+  Float32 x1 = x0 - i1 + G2; // Offsets for middle corner in (x,y) unskewed coords
+  Float32 y1 = y0 - j1 + G2;
+  Float32 x2 = x0 - 1.0 + 2.0 * G2; // Offsets for last corner in (x,y) unskewed coords
+  Float32 y2 = y0 - 1.0 + 2.0 * G2;
+  // Work out the hashed gradient indices of the three simplex corners
+  Integer ii = i & 255;
+  Integer jj = j & 255;
+  Integer gi0 = permMod12[ii+perm[jj]];
+  Integer gi1 = permMod12[ii+i1+perm[jj+j1]];
+  Integer gi2 = permMod12[ii+1+perm[jj+1]];
+  // Calculate the contribution from the three corners
+  Float32 t0 = 0.5 - x0*x0-y0*y0;
+  if(t0<0) n0 = 0.0;
+  else {
+    t0 *= t0;
+    n0 = t0 * t0 * dot(grad3[gi0], x0, y0);  // (x,y) of grad3 used for 2D gradient
+  }
+  Float32 t1 = 0.5 - x1*x1-y1*y1;
+  if(t1<0) n1 = 0.0;
+  else {
+    t1 *= t1;
+    n1 = t1 * t1 * dot(grad3[gi1], x1, y1);
+  }
+  Float32 t2 = 0.5 - x2*x2-y2*y2;
+  if(t2<0) n2 = 0.0;
+  else {
+    t2 *= t2;
+    n2 = t2 * t2 * dot(grad3[gi2], x2, y2);
+  }
+  // Add contributions from each corner to get the final noise value.
+  // The result is scaled to return values in the interval [-1,1].
+  return 70.0 * (n0 + n1 + n2);
+}

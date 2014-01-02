@@ -1,0 +1,57 @@
+require RGB;
+require Image2DRGB;
+require Noise;
+
+operator computePixels<<<index>>>(
+  io Image2DRGB image,
+  in Float32 scale,
+  in Integer noiseType)
+{
+  Index row = index / image.width;
+  Index col = index % image.width;
+  Float32 u = 0.0;
+  Float32 v = 0.0;
+
+  if (row>0)
+  {
+    u = Float32(row)/Float32(image.height);
+    u *= scale;
+  }
+  if (col>0)
+  {
+    v = Float32(col)/Float32(image.width);
+    v *= scale;
+  }
+
+  Float32 value = 0.0;
+  //UInt64 start = getCurrentTicks();
+  switch(noiseType)
+  {
+    case 0:
+      value = (perlin(u, v) + 1.0)*0.5; 
+      break;
+    case 1:
+      value = (simplex(u, v) + 1.0)*0.5;
+      break;
+    default:
+      value = (perlin(u, v) + 1.0)*0.5;
+      break;
+  }
+  //UInt64 end = getCurrentTicks();
+  //report("Elapsed time: " + getSecondsBetweenTicks(start, end) + " seconds");
+
+  Byte shade = Byte(value*256);
+  image.setPixel(col, row, RGB(shade,shade,shade));
+}
+
+operator proceduralNoise(
+  Size resolution,
+  Float32 scale,
+  UInt32 noiseType,
+  io Image2DRGB image)
+{
+  image.resize(resolution, resolution);
+
+  computePixels<<<image.pixels.size()>>>(image, scale, noiseType);
+  image.incrementVersion();
+}
