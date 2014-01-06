@@ -1,9 +1,10 @@
 require RGB;
-require Image2DRGB;
+require Image2DRGBA;
 require Noise;
+require FabricCIMG;
 
 operator computePixels<<<index>>>(
-  io Image2DRGB image,
+  io Image2DRGBA image,
   in Float32 scale,
   in Integer noiseType)
 {
@@ -41,17 +42,28 @@ operator computePixels<<<index>>>(
   //report("Elapsed time: " + getSecondsBetweenTicks(start, end) + " seconds");
 
   Byte shade = Byte(value*256);
-  image.setPixel(col, row, RGB(shade,shade,shade));
+  image.setPixel(col, row, RGBA(shade,shade,shade,255));
 }
 
 operator proceduralNoise(
   Size resolution,
   Float32 scale,
   UInt32 noiseType,
-  io Image2DRGB image)
+  io Image2DRGBA image,
+  in Boolean write)
 {
   image.resize(resolution, resolution);
 
   computePixels<<<image.pixels.size()>>>(image, scale, noiseType);
   image.incrementVersion();
+
+  if (write)
+  {
+    FabricCIMGSaveToFileHandle("./ProceduralNoiseImage.tif",
+        resolution,
+        resolution,
+        false,
+        image.pixels
+        );
+  }
 }
